@@ -1,0 +1,38 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuth() { return request.auth != null; }
+
+    // Student photos
+    match /students/{studentId}/photo {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Worksheets / exercises
+    match /worksheets/{file} {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.resource.size < 50 * 1024 * 1024;
+    }
+
+    // Notice attachments
+    match /notices/{file} {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.resource.size < 20 * 1024 * 1024;
+    }
+
+    // Library
+    match /library/{file} {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.resource.size < 100 * 1024 * 1024;
+    }
+
+    // Payment proof
+    match /payments/{file} {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

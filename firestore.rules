@@ -1,0 +1,149 @@
+rules_version = '2';
+// DTW EduConnect — Firestore Security Rules
+// Desenvolvido por DTW (Devs To World)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+    function isAuth() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(uid())); }
+    function role() { return userDoc().data.role; }
+    function isDirection() { return role() == 'direction'; }
+    function isTeacher() { return role() == 'teacher'; }
+    function isStudent() { return role() == 'student'; }
+    function isParent() { return role() == 'parent'; }
+    function isDirectionOrTeacher() { return role() in ['direction', 'teacher']; }
+
+    // ─── Users ───────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuth() && (uid() == userId || isDirection());
+      allow create: if isAuth() && isDirection();
+      allow update: if isAuth() && (uid() == userId || isDirection());
+      allow delete: if isAuth() && isDirection();
+    }
+
+    // ─── Students ────────────────────────────────────────────────────────────
+    match /students/{studentId} {
+      allow read: if isAuth() && (
+        isDirection() ||
+        isTeacher() ||
+        (isStudent() && resource.data.userId == uid()) ||
+        (isParent() && resource.data.parentId == uid())
+      );
+      allow create, update: if isAuth() && isDirectionOrTeacher();
+      allow delete: if isAuth() && isDirection();
+    }
+
+    // ─── Teachers ────────────────────────────────────────────────────────────
+    match /teachers/{teacherId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isDirection();
+    }
+
+    // ─── Parents ─────────────────────────────────────────────────────────────
+    match /parents/{parentId} {
+      allow read: if isAuth() && (isDirection() || uid() == parentId);
+      allow write: if isAuth() && isDirection();
+    }
+
+    // ─── Classes ─────────────────────────────────────────────────────────────
+    match /classes/{classId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isDirection();
+    }
+
+    // ─── Classrooms ──────────────────────────────────────────────────────────
+    match /classrooms/{classroomId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isDirectionOrTeacher();
+    }
+
+    // ─── Grades ──────────────────────────────────────────────────────────────
+    match /grades/{gradeId} {
+      allow read: if isAuth() && (
+        isDirection() ||
+        isTeacher() ||
+        (isStudent() && resource.data.studentId == uid()) ||
+        (isParent() && get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.parentId == uid())
+      );
+      allow create, update: if isAuth() && isDirectionOrTeacher();
+      allow delete: if isAuth() && isDirection();
+    }
+
+    // ─── Attendance ──────────────────────────────────────────────────────────
+    match /attendance/{recordId} {
+      allow read: if isAuth() && (
+        isDirection() ||
+        isTeacher() ||
+        (isStudent() && resource.data.studentId == uid()) ||
+        (isParent() && get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.parentId == uid())
+      );
+      allow create, update: if isAuth() && isDirectionOrTeacher();
+      allow delete: if isAuth() && isDirection();
+    }
+
+    // ─── Notices ─────────────────────────────────────────────────────────────
+    match /notices/{noticeId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth() && isDirectionOrTeacher();
+      allow delete: if isAuth() && isDirection();
+    }
+
+    // ─── Schedules ───────────────────────────────────────────────────────────
+    match /schedules/{scheduleId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isDirectionOrTeacher();
+    }
+
+    // ─── Worksheets ──────────────────────────────────────────────────────────
+    match /worksheets/{worksheetId} {
+      allow read: if isAuth();
+      allow create, update: if isAuth() && isDirectionOrTeacher();
+      allow delete: if isAuth() && (isDirection() || (isTeacher() && resource.data.teacherId == uid()));
+    }
+
+    // ─── Library ─────────────────────────────────────────────────────────────
+    match /library/{itemId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && isDirectionOrTeacher();
+    }
+
+    // ─── Payments ────────────────────────────────────────────────────────────
+    match /payments/{paymentId} {
+      allow read: if isAuth() && (
+        isDirection() ||
+        (isParent() && get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.parentId == uid()) ||
+        (isStudent() && resource.data.studentId == uid())
+      );
+      allow create, update: if isAuth() && isDirection();
+      allow delete: if isAuth() && isDirection();
+    }
+
+    // ─── Reports ─────────────────────────────────────────────────────────────
+    match /reports/{reportId} {
+      allow read: if isAuth() && isDirectionOrTeacher();
+      allow write: if isAuth() && isDirection();
+    }
+
+    // ─── AI Conversations ────────────────────────────────────────────────────
+    match /ai_conversations/{convId} {
+      allow read: if isAuth() && (resource.data.userId == uid() || isDirection());
+      allow create: if isAuth() && request.resource.data.userId == uid();
+      allow update, delete: if isAuth() && resource.data.userId == uid();
+    }
+
+    // ─── QR Logs ─────────────────────────────────────────────────────────────
+    match /qr_logs/{logId} {
+      allow read: if isAuth() && (
+        isDirection() ||
+        isTeacher() ||
+        (isStudent() && resource.data.studentId == uid()) ||
+        (isParent() && get(/databases/$(database)/documents/students/$(resource.data.studentId)).data.parentId == uid())
+      );
+      allow create: if isAuth();
+      allow update, delete: if isAuth() && isDirection();
+    }
+  }
+}
